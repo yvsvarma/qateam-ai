@@ -1,0 +1,11 @@
+Test Case Title,Description
+test case 1: Verify that the content in document.xml is displayed correctly,without any missing data or formatting issues.
+test case 2: Check that the numbering styles in numbering.xml are applied to the document correctly.,
+test case 3: Ensure that the font styles defined in fontTable.xml are properly displayed and applied in the document.,
+test case 4: Verify that the settings specified in settings.xml are correctly implemented in the document.,
+test case 5: Confirm that the theme defined in theme1.xml is consistent and properly displayed throughout the document.,
+test case 6: Check that the styles specified in styles.xml are properly applied to the content in the document.,
+test case 7: Validate that the web settings in webSettings.xml are correctly implemented and displayed in the document.,
+test case 8: Ensure that the core properties in core.xml are accurately defined and displayed in the document.,
+test case 9: Verify that the application properties in app.xml are correctly defined and displayed in the document.,
+test case 10: Confirm that the relationships defined in document.xml.rels are properly established and displayed in the document.,

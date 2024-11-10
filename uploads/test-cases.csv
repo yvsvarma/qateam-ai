@@ -1,0 +1,18 @@
+ID,Test Case
+1,Test Plan
+2,
+3,1. Verify that the word document opens correctly.
+4,2. Verify that the document properties are displayed correctly.
+5,3. Verify that the theme is applied correctly to the document.
+6,4. Verify that the document settings are loaded correctly.
+7,5. Verify that the numbering format in the document is correct.
+8,6. Verify that the styles in the document are displayed correctly.
+9,7. Verify that the web settings for the document are applied correctly.
+10,8. Verify that the font table is loaded and displayed correctly.
+11,9. Check the relationships in the document.
+12,10. Verify that all content types are supported and displayed correctly.
+13,11. Perform data validation tests to ensure all data is accurate and complete.
+14,12. Perform cross-browser testing to ensure compatibility across different browsers.
+15,13. Perform regression testing to ensure all previously reported bugs have been fixed.
+16,14. Conduct security testing to ensure the document is not vulnerable to any security threats.
+17,15. Test the document on different devices to ensure responsive design.

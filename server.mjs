@@ -1,84 +1,76 @@
 import express from "express";
-import fetch from "node-fetch";
 import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import mongoose from "mongoose"; // Ensure mongoose is imported for DB operations
-import nodemailer from "nodemailer"; // Add nodemailer for sending emails
-import bcrypt from "bcrypt"; // For password hashing
-import { createObjectCsvWriter } from "csv-writer"; // For CSV file creation
-import { Document, Packer, Paragraph, TextRun } from "docx"; // For Word document creation
-import { fileURLToPath } from "url"; // For ES module
+import mongoose from "mongoose";
+import nodemailer from "nodemailer";
+import bcrypt from "bcrypt";
+import { createObjectCsvWriter } from "csv-writer";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { OpenAI } from "openai";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+dotenv.config({ path: ".env.local" });
+const app = express();
+const apiKey = process.env.OPENAI_API_KEY;
+
+app.use(cors());
+app.use(express.json());
+
+// Configure multer for file uploads
+const storage = multer.memoryStorage(); // Use memory storage to hold file in memory
+const upload = multer({ storage: storage });
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const apiKey = process.env.OPENAI_API_KEY;
-
-// CORS configuration
-app.use(
-  cors({
-    origin: "http://localhost:3001", // Change to your frontend URL if deploying
-    credentials: true, // Allow credentials to be included
-  })
-);
-
-app.use(express.json());
-
-// MongoDB connection
 mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-// Define a User schema
+// User Schema
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
   password: String,
-  isVerified: { type: Boolean, default: false }, // Flag for verification
-  verificationToken: String, // Token for email verification
+  isVerified: { type: Boolean, default: false },
+  verificationToken: String,
 });
 
 const User = mongoose.model("User", userSchema);
 
-// Route for signup
+// Signup Route
 app.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
 
-  // Log the signup attempt
-  console.log(`Signup attempt: Name: ${name}, Email: ${email}`);
-
-  // Check for existing user
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     return res.status(400).json({ message: "Email already exists." });
   }
 
-  const verificationToken = Math.random().toString(36).substr(2); // Simple token generation
+  const verificationToken = Math.random().toString(36).substr(2);
 
   const newUser = new User({
     name,
     email,
-    password: await bcrypt.hash(password, 10), // Hash password
+    password: await bcrypt.hash(password, 10),
     verificationToken,
   });
 
   try {
     await newUser.save();
 
-    // Send verification email
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_SERVER,
       port: process.env.SMTP_PORT,
+      secure: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -90,7 +82,7 @@ app.post("/signup", async (req, res) => {
       to: email,
       subject: "Account Verification",
       text: `Please verify your account by clicking the link: 
-  http://localhost:3000/verify/${verificationToken}`,
+      http://localhost:3000/verify/${verificationToken}`,
     };
 
     await transporter.sendMail(mailOptions);
@@ -106,7 +98,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// Route for verifying email
+// Verify Route
 app.get("/verify/:token", async (req, res) => {
   const { token } = req.params;
 
@@ -117,39 +109,115 @@ app.get("/verify/:token", async (req, res) => {
   }
 
   user.isVerified = true;
-  user.verificationToken = undefined; // Remove token after verification
+  user.verificationToken = undefined;
   await user.save();
 
-  res.redirect("/"); // Redirect to the login page or wherever you want
+  res.redirect("/");
 });
 
-// Route for login
+// Login Route
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
-  console.log(`Login attempt: ${username}`); // Log received credentials
+  const user = await User.findOne({ email: username });
 
-  const user = await User.findOne({ email: username }); // Use email as username
-  res.status(200).json({ message: "Login successful!" });
+  if (!user) {
+    return res.status(401).json({ message: "Invalid username or password." });
+  }
 
-  // if (!user) {
-  // res.status(200).json({ message: "Login successful!" });
+  if (!user.isVerified) {
+    return res
+      .status(403)
+      .json({ message: "Please verify your email to log in." });
+  }
 
-  //return res.status(401).json({ message: "Invalid username or password." });
-  // }
+  const isMatch = await bcrypt.compare(password, user.password);
 
-  // const isMatch = await bcrypt.compare(password, user.password);
-
-  // if (isMatch && user.isVerified) {
-  //   res.status(200).json({ message: "Login successful!" });
-  // } else {
-  //   res.status(200).json({ message: "Login successful!" });
-
-  //   //res.status(401).json({ message: "Invalid username or password." });
-  // }
+  if (isMatch && user.isVerified) {
+    res.status(200).json({ message: "Login successful!" });
+  } else {
+    res.status(401).json({ message: "Invalid username or password." });
+  }
 });
+
+// Route for generating a file
+app.post("/generate-file", upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res
+      .status(400)
+      .json({ message: "File is required to generate the file." });
+  }
+
+  const brdContent = req.file.buffer.toString(); // Read the uploaded file content
+  const prompt = `Generate a test plan based on the following BRD content:\n${brdContent}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+    });
+
+    const generatedContent = response.choices[0].message.content;
+
+    if (req.body.downloadType === "test-cases") {
+      // Generate CSV for test cases
+      const csvWriter = createObjectCsvWriter({
+        path: "uploads/test-cases.csv",
+        header: [
+          { id: "id", title: "ID" },
+          { id: "testCase", title: "Test Case" },
+        ],
+      });
+
+      const rows = generatedContent.split("\n").map((testCase, index) => ({
+        id: index + 1,
+        testCase: testCase.trim(),
+      }));
+
+      await csvWriter.writeRecords(rows);
+
+      res.download("uploads/test-cases.csv", "test-cases.csv", (err) => {
+        if (err) {
+          console.error("Error sending the file:", err);
+        }
+      });
+    } else if (req.body.downloadType === "test-plan") {
+      // Generate Word document for test plan
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({
+                children: [new TextRun(generatedContent)],
+              }),
+            ],
+          },
+        ],
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const testPlanPath = path.join(__dirname, "uploads", "test-plan.docx");
+      fs.writeFileSync(testPlanPath, buffer);
+
+      res.download(testPlanPath, "test-plan.docx", (err) => {
+        if (err) {
+          console.error("Error sending the file:", err);
+        }
+      });
+    } else {
+      res.status(400).json({ message: "Invalid download type." });
+    }
+  } catch (error) {
+    console.error("Error generating file:", error);
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
+// Sample BRD download route
 app.get("/download-sample-brd", (req, res) => {
-  const file = path.join(__dirname, "public", "files", "sample-brd.docx"); // Adjust path accordingly
+  const file = path.join(__dirname, "public", "files", "sample-brd.docx");
   res.download(file, "sample_brd.docx", (err) => {
     if (err) {
       console.error("File download error:", err);

@@ -1,0 +1,34 @@
+Section,Description
+1,Test Plan:
+2,
+3,1. Test Case 1: Verify the presence of .rels extension in _rels folder for each type of file
+4,- Test Procedure: Access each type of file in the project directory and navigate to the _rels folder to check for the presence of the .rels extension file.
+5,- Expected Result: .rels extension file should be present in the _rels folder for each type of file.
+6,
+7,2. Test Case 2: Verify the formatting of properties in core.xml in docProps folder
+8,"- Test Procedure: Open core.xml file in the docProps folder and verify the formatting of properties such as author, title, description, etc."
+9,- Expected Result: Properties in core.xml should be correctly formatted as per the requirements.
+10,
+11,3. Test Case 3: Verify the presence of folder.docx in \word directory
+12,- Test Procedure: Confirm the existence of folder.docx file in the \word directory of the project.
+13,- Expected Result: folder.docx file should be present in the \word directory.
+14,
+15,4. Test Case 4: Verify the presence of theme1.xml in word/theme folder
+16,- Test Procedure: Navigate to the word/theme folder and check for the presence of theme1.xml file.
+17,- Expected Result: theme1.xml should be present in the word/theme folder.
+18,
+19,5. Test Case 5: Verify the presence and correctness of styles in \word\styles.xml
+20,- Test Procedure: Open styles.xml file in \word folder and verify the presence and correctness of styles defined in the file.
+21,- Expected Result: Styles should be present and correctly formatted in styles.xml.
+22,
+23,6. Test Case 6: Verify the presence and correctness of web settings in \word\webSettings.xml
+24,- Test Procedure: Access webSettings.xml file in the \word folder and verify the presence and correctness of web settings.
+25,- Expected Result: Web settings should be present and accurately defined in webSettings.xml.
+26,
+27,7. Test Case 7: Verify the presence and correctness of font table in \word\fontTable.xml
+28,- Test Procedure: Open fontTable.xml file in the \word folder and verify the presence and correctness of font table entries.
+29,- Expected Result: Font table should be present and accurately defined in fontTable.xml.
+30,
+31,8. Test Case 8: Verify the presence of numbering in \word\numbering.xml
+32,- Test Procedure: Check for the existence of numbering.xml file in the \word directory.
+33,- Expected Result: numbering.xml should be present in the \word
