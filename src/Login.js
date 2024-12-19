@@ -1,20 +1,23 @@
 import React, { useState } from "react";
-import { Button, TextField, Box, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { FaEye, FaEyeSlash, FaHome } from "react-icons/fa"; // Import eye icons from react-icons
+import { useNavigate } from "react-router-dom";
 
 const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate(); // Use useNavigate hook
+  const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
+    console.log("Email: ", email);
+    console.log("Password: ", password);
     e.preventDefault();
     setError(""); // Reset error
 
     // Validation
-    if (!username || !password) {
-      setError("Username and password are required.");
+    if (!email || !password) {
+      setError("Both fields are required.");
       return;
     }
 
@@ -22,17 +25,16 @@ const Login = ({ onLogin }) => {
       const response = await fetch("http://localhost:3000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Login successful
-        onLogin(); // Call the onLogin function to navigate to the TestGenerator component
-        navigate("/landing"); // Add this line to navigate to the landing page
+        onLogin();
+        navigate("/landing"); // Redirect to the dashboard after successful login
       } else {
-        setError(data.message || "Login failed. Please try again.");
+        setError(data.message || "An error occurred while logging in.");
       }
     } catch (error) {
       setError("An error occurred while logging in. Please try again.");
@@ -40,58 +42,62 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <Box
-      sx={{
-        maxWidth: "400px",
-        margin: "auto",
-        padding: "20px",
-        backgroundColor: "#f5f5f5",
-        borderRadius: "10px",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-        textAlign: "center",
-      }}
-    >
-      <Typography variant="h5" gutterBottom>
-        Login
-      </Typography>
-      <form onSubmit={handleLogin}>
-        <TextField
-          label="Username"
-          variant="outlined"
-          fullWidth
-          sx={{ mb: 3 }}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <TextField
-          label="Password"
-          type="password"
-          variant="outlined"
-          fullWidth
-          sx={{ mb: 3 }}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {error && (
-          <Typography color="error" sx={{ mb: 3 }}>
-            {error}
-          </Typography>
-        )}
-        <Button variant="contained" color="primary" type="submit" fullWidth>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
           Login
-        </Button>
-      </form>
-      <Typography variant="body2" sx={{ mt: 2 }}>
-        Don't have an account?{" "}
-        <Button
-          onClick={() => navigate("/signup")} // Use navigate to go to signup page
-          color="primary"
-          sx={{ textTransform: "none" }}
-        >
-          Go to Signup
-        </Button>
-      </Typography>
-    </Box>
+        </h2>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <input
+            type="email"
+            placeholder="Email Address"
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+
+          {/* Password Field */}
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
+
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+          <button
+            type="submit"
+            className="w-full py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            Login
+          </button>
+        </form>
+
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">Don't have an account? </p>
+
+          {/* Back to Home Button */}
+          <button
+            onClick={() => navigate("/")}
+            className="mt-4 flex items-center justify-center text-indigo-600 hover:underline focus:outline-none"
+          >
+            <FaHome className="mr-2" />
+            Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 

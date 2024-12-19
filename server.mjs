@@ -1,41 +1,45 @@
-import express from "express";
+// Import necessary libraries
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import bcrypt from "bcrypt"; // Placeholder, replace with actual library
 import cors from "cors";
-import dotenv from "dotenv";
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import mongoose from "mongoose";
-import nodemailer from "nodemailer";
-import bcrypt from "bcrypt";
 import { createObjectCsvWriter } from "csv-writer";
 import { Document, Packer, Paragraph, TextRun } from "docx";
+import dotenv from "dotenv";
+import express from "express";
+import fs from "fs"; // Placeholder, replace with actual library
+import mongoose from "mongoose";
+import multer from "multer";
+import nodemailer from "nodemailer";
 import { OpenAI } from "openai";
+import path from "path";
 import { fileURLToPath } from "url";
 
 dotenv.config({ path: ".env.local" });
+
 const app = express();
-const apiKey = process.env.OPENAI_API_KEY;
-
-app.use(cors());
-app.use(express.json());
-
-// Configure multer for file uploads
-const storage = multer.memoryStorage(); // Use memory storage to hold file in memory
-const upload = multer({ storage: storage });
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
+const PORT = process.env.PORT || 3000;
+//const apiKey = process.env.OPENAI_API_KEY;
+const apiKey = process.env.API_KEY_FOR_AI;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// User Schema
+// Setup for file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+let openai, genAI, model;
+// Initialize OpenAI API
+if (apiKey.startsWith("sk-proj")) {
+  openai = new OpenAI({ apiKey });
+} else {
+  genAI = new GoogleGenerativeAI(apiKey);
+  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
+
+// User schema and model
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -43,125 +47,82 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },
   verificationToken: String,
 });
-
 const User = mongoose.model("User", userSchema);
+// Helper function to detect API provider
+function detectAIProvider(apiKey) {
+  if (apiKey.startsWith("sk-")) return "openai"; // Example: OpenAI keys start with "sk-"
+  if (apiKey.startsWith("bing-")) return "bing"; // Example: Bing keys might start with "bing-"
+  if (apiKey.startsWith("gem-")) return "gemini"; // Example: Gemini keys might start with "gem-"
+  throw new Error("Unsupported API key format.");
+}
 
-// Signup Route
-app.post("/signup", async (req, res) => {
-  const { name, email, password } = req.body;
-
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({ message: "Email already exists." });
+// Helper function to initialize the AI client
+function initializeAIClient(apiKey) {
+  const provider = detectAIProvider(apiKey);
+  switch (provider) {
+    case "openai":
+      return new OpenAI({ apiKey });
+    case "bing":
+    //return new BingAI({ apiKey });
+    case "gemini":
+    //return new GeminiAI({ apiKey });
+    default:
+      throw new Error("AI provider not supported.");
   }
+}
+// Initialize AI client
+let aiClient;
+try {
+  const apiKey = process.env.API_KEY_FOR_AI;
+  if (!apiKey) {
+    throw new Error("API key is not configured.");
+  }
+  //aiClient = initializeAIClient(apiKey);
+  console.log("AI client initialized successfully.");
+} catch (error) {
+  console.error("Error initializing AI client:", error.message);
+  process.exit(1);
+}
 
-  const verificationToken = Math.random().toString(36).substr(2);
-
-  const newUser = new User({
-    name,
-    email,
-    password: await bcrypt.hash(password, 10),
-    verificationToken,
-  });
-
+// Verify route
+app.get("/verify/:token", async (req, res, next) => {
   try {
-    await newUser.save();
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_SERVER,
-      port: process.env.SMTP_PORT,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Account Verification",
-      text: `Please verify your account by clicking the link: 
-      http://localhost:3000/verify/${verificationToken}`,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.status(200).json({
-      message: "Signup successful! Please check your email for verification.",
-    });
+    const user = await User.findOne({ verificationToken: req.params.token });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid token." });
+    }
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+    res.redirect("/");
   } catch (error) {
-    console.error("Signup error:", error);
-    res
-      .status(500)
-      .json({ message: "Error creating account. Please try again." });
+    next(error);
   }
 });
 
-// Verify Route
-app.get("/verify/:token", async (req, res) => {
-  const { token } = req.params;
-
-  const user = await User.findOne({ verificationToken: token });
-
-  if (!user) {
-    return res.status(400).json({ message: "Invalid token." });
-  }
-
-  user.isVerified = true;
-  user.verificationToken = undefined;
-  await user.save();
-
-  res.redirect("/");
-});
-
-// Login Route
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-
-  const user = await User.findOne({ email: username });
-
-  if (!user) {
-    return res.status(401).json({ message: "Invalid username or password." });
-  }
-
-  if (!user.isVerified) {
-    return res
-      .status(403)
-      .json({ message: "Please verify your email to log in." });
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (isMatch && user.isVerified) {
-    res.status(200).json({ message: "Login successful!" });
-  } else {
-    res.status(401).json({ message: "Invalid username or password." });
-  }
-});
-
-// Route for generating a file
-app.post("/generate-file", upload.single("file"), async (req, res) => {
-  if (!req.file) {
-    return res
-      .status(400)
-      .json({ message: "File is required to generate the file." });
-  }
-
-  const brdContent = req.file.buffer.toString(); // Read the uploaded file content
-  const prompt = `Generate a test plan based on the following BRD content:\n${brdContent}`;
-
+// File generation route
+app.post("/generate-file", upload.single("file"), async (req, res, next) => {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-    });
+    if (!req.file)
+      return res.status(400).json({ message: "File is required." });
+    const brdContent = req.file.buffer.toString();
+    const prompt = `Generate a test plan based on the following BRD content:\n${brdContent}`;
+    let response, generatedContent, result;
+    if (apiKey.startsWith("sk-proj")) {
+      response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+      });
+      generatedContent = response.choices[0].message.content;
+    } else {
+      result = await model.generateContent(prompt);
+      generatedContent = result.response.text();
+    }
 
-    const generatedContent = response.choices[0].message.content;
+    //generatedContent = response.choices[0].message.content;
 
     if (req.body.downloadType === "test-cases") {
-      // Generate CSV for test cases
       const csvWriter = createObjectCsvWriter({
         path: "uploads/test-cases.csv",
         header: [
@@ -169,49 +130,31 @@ app.post("/generate-file", upload.single("file"), async (req, res) => {
           { id: "testCase", title: "Test Case" },
         ],
       });
-
       const rows = generatedContent.split("\n").map((testCase, index) => ({
         id: index + 1,
         testCase: testCase.trim(),
       }));
-
       await csvWriter.writeRecords(rows);
-
-      res.download("uploads/test-cases.csv", "test-cases.csv", (err) => {
-        if (err) {
-          console.error("Error sending the file:", err);
-        }
-      });
+      res.download("uploads/test-cases.csv", "test-cases.csv");
     } else if (req.body.downloadType === "test-plan") {
-      // Generate Word document for test plan
       const doc = new Document({
         sections: [
           {
-            properties: {},
             children: [
-              new Paragraph({
-                children: [new TextRun(generatedContent)],
-              }),
+              new Paragraph({ children: [new TextRun(generatedContent)] }),
             ],
           },
         ],
       });
-
       const buffer = await Packer.toBuffer(doc);
       const testPlanPath = path.join(__dirname, "uploads", "test-plan.docx");
       fs.writeFileSync(testPlanPath, buffer);
-
-      res.download(testPlanPath, "test-plan.docx", (err) => {
-        if (err) {
-          console.error("Error sending the file:", err);
-        }
-      });
+      res.download(testPlanPath, "test-plan.docx");
     } else {
       res.status(400).json({ message: "Invalid download type." });
     }
   } catch (error) {
-    console.error("Error generating file:", error);
-    res.status(500).json({ error: "Something went wrong." });
+    next(error);
   }
 });
 
@@ -226,7 +169,56 @@ app.get("/download-sample-brd", (req, res) => {
   });
 });
 
-// Start the server on port 3000
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+// Endpoint to update and validate API Key
+app.post("/update-api-key", (req, res) => {
+  const { apiKey } = req.body;
+
+  if (!apiKey) {
+    return res
+      .status(400)
+      .json({ valid: false, message: "API Key is required" });
+  }
+
+  // Update the .env file with the new API key
+  fs.readFile(".env.local", "utf8", (err, data) => {
+    if (err) {
+      console.error("Error reading .env file:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+
+    // Update or add the API_KEY line
+    const envContent = data.includes("API_KEY_FOR_AI")
+      ? data.replace(/API_KEY_FOR_AI=.*/, `API_KEY_FOR_AI=${apiKey}`)
+      : `${data}\nAPI_KEY_FOR_AI=${apiKey}`;
+
+    // Write the updated content back to the .env file
+    fs.writeFile(".env.local", envContent, (writeErr) => {
+      if (writeErr) {
+        console.error("Error updating .env file:", writeErr);
+        return res.status(500).json({ message: "Failed to save API key" });
+      }
+
+      // Reload the updated environment variables
+      process.env.API_KEY_FOR_AI = apiKey;
+      if (apiKey.startsWith("sk-proj")) {
+        openai = new OpenAI({ apiKey });
+      } else {
+        genAI = new GoogleGenerativeAI(apiKey);
+        model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      }
+
+      res.json({ valid: true, message: "API Key updated successfully" });
+    });
+  });
+});
+
+// Central error-handling middleware
+app.use((err, req, res, next) => {
+  console.error("Server Error:", err);
+  res.status(500).json({ message: "Internal server error." });
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

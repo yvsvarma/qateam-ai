@@ -1,47 +1,41 @@
 import React from "react";
-import { Box, Typography, Button } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
+import { Link, useNavigate } from "react-router-dom";
 
 const LandingPage = ({ onLogout }) => {
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    onLogout(); // Call the logout function passed as a prop
-    navigate("/"); // Navigate to the login page
+    onLogout();
+    navigate("/");
   };
 
   return (
-    <Box
-      sx={{
-        maxWidth: "800px",
-        margin: "auto",
-        padding: "20px",
-        textAlign: "center",
-      }}
-    >
-      <Typography variant="h3" gutterBottom>
+    <div className="max-w-3xl mx-auto p-6 mt-10 text-center bg-gray-100 rounded-lg shadow-lg">
+      <h1 className="text-4xl font-bold text-gray-800 mb-4">
         Welcome to the Tester App
-      </Typography>
-      <Typography variant="h6" gutterBottom>
-        Choose an option below:
-      </Typography>
-      <Box sx={{ display: "flex", justifyContent: "center", gap: "20px" }}>
-        <Button component={Link} to="/projects" variant="contained">
-          Projects
-        </Button>
-        <Button component={Link} to="/test-generator" variant="contained">
-          Test Case Generator
-        </Button>
-      </Box>
-      <Button
-        variant="outlined"
-        color="error"
+      </h1>
+      <p className="text-lg text-gray-600 mb-8">Choose an option below:</p>
+      
+      <div className="flex justify-center gap-4 mb-6">
+        <Link to="/projects">
+          <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition duration-200">
+            Projects
+          </button>
+        </Link>
+        <Link to="/test-generator">
+          <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition duration-200">
+            Test Case Generator
+          </button>
+        </Link>
+      </div>
+      
+      {/*<button
         onClick={handleLogout}
-        sx={{ mt: 3 }}
+        className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition duration-200"
       >
         Logout
-      </Button>
-    </Box>
+      </button>*/}
+    </div>
   );
 };
 
